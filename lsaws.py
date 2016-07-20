@@ -39,19 +39,21 @@ def ls(profile, region):
     ec2 = init_session(profile, region)
     print "Searching instances in %s: %s" % (profile, region)
     for i in ec2.instances.all():
-        if i.tags is None:
+        try:
+            if i.tags is None:
+                continue
+            for t in i.tags:
+                if t['Key'] == 'Name':
+                    printing(profile, region, i.state['Name'], i.instance_type, t['Value'], i.id, i.private_ip_address, i.public_ip_address)
+        except:
             continue
-        for t in i.tags:
-            if t['Key'] == 'Name':
-                printing(profile, region, i.state['Name'], i.instance_type, t['Value'], i.id, i.private_ip_address)
 
-def printing(profile, region, state, inst_type, tag_name, inst_id, inst_privip):
-    output = "{0} : {1} : {2} ({3}) : {4} : {5}".format(profile, region, tag_name, inst_id, inst_type, inst_privip)
+def printing(profile, region, state, inst_type, tag_name, inst_id, inst_privip, inst_public):
+    output = "{0} : {1} : {2} ({3}) : {4} : {5} : {6}".format(profile, region, tag_name, inst_id, inst_type, inst_privip, inst_public)
     pstate = "[{0}]".format(state)
     if state == "running":
         print(Style.BRIGHT + Fore.GREEN + pstate + Style.RESET_ALL),
         print(Style.BRIGHT + output + Style.RESET_ALL)
-
     else:
         print(Fore.RED + pstate + Style.RESET_ALL),
         print output
