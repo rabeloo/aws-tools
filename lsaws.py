@@ -35,6 +35,20 @@ def init_session(profile, region):
     ses = boto3.session.Session(profile_name=profile,region_name=region)
     return ses.resource('ec2')
 
+def genHostFile(tag_name, inst_privip):
+    for inst in ec2.instances.all():
+        if inst.state["Name"] == "running":
+	    try:
+                if inst.tags is None:
+                    continue
+                for tag in inst.tags:
+                    if tag['Key'] == 'Name':
+    			output = "Host {0}\n  Hostname {1}\n  User inf_roliveira\n".format(tag_name, inst_privip)
+			file = open("config-aws", "a")
+			file.write(output)
+            except:
+                continue
+
 def ls(profile, region):
     ec2 = init_session(profile, region)
     print "Searching instances in %s: %s" % (profile, region)
@@ -43,20 +57,29 @@ def ls(profile, region):
             if i.tags is None:
                 continue
             for t in i.tags:
+                if t['Key'] == 'Sistema':
+                    tag_sistema = t['Value']
+                if t['Key'] == 'Produto':
+                    tag_produto = t['Value']
                 if t['Key'] == 'Name':
-                    printing(profile, region, i.state['Name'], i.instance_type, t['Value'], i.id, i.private_ip_address, i.public_ip_address)
+                    tag_name = t['Value']
+
+            printing(profile, region, i.state['Name'], i.instance_type, tag_name, i.id, tag_produto, tag_sistema, i.private_ip_address, i.public_ip_address)
+
         except:
             continue
 
-def printing(profile, region, state, inst_type, tag_name, inst_id, inst_privip, inst_public):
-    output = "{0} : {1} : {2} ({3}) : {4} : {5} : {6}".format(profile, region, tag_name, inst_id, inst_type, inst_privip, inst_public)
-    pstate = "[{0}]".format(state)
-    if state == "running":
-        print(Style.BRIGHT + Fore.GREEN + pstate + Style.RESET_ALL),
-        print(Style.BRIGHT + output + Style.RESET_ALL)
-    else:
-        print(Fore.RED + pstate + Style.RESET_ALL),
+def printing(profile, region, state, inst_type, tag_name, inst_id, tag_produto, tag_sistema, inst_privip, inst_public):
+    if state != 'terminated':
+        output = "{0},{1},{2},{3},{4},{5},{6},{7},{8},{9}".format(state,profile, region, tag_name, inst_id, tag_produto, tag_sistema, inst_type, inst_privip, inst_public)
         print output
+
+    # if state == "running":
+        # print(Style.BRIGHT + Fore.GREEN + pstate + Style.RESET_ALL),
+        # print(Style.BRIGHT + output + Style.RESET_ALL)
+    # else:
+        # print(Fore.RED + pstate + Style.RESET_ALL),
+        # print output
 
 # Looking for profiles in credentials file
 profiles = []
@@ -64,12 +87,14 @@ credentials_file = expanduser("~/.aws/credentials")
 parser = ConfigParser.ConfigParser()
 parser.read(credentials_file)
 for p in parser.sections():
-    if p.find("bp-") != -1:
+    if p.find("-api") != -1:
         profiles.append(p)
 
 # Parameters
 parser = optparse.OptionParser()
 parser.add_option('-p', '--profile', help='Profile of awscli credentials file to use.')
+parser.add_option('-g', '--gen-ssh-config', help='Generate SSH Config file aws_config.hosts')
+
 # Mandatories parameters
 (options, args) = parser.parse_args()
 mandatories = ['profile']
